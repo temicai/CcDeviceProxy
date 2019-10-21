@@ -1,0 +1,5 @@
+LIBRARY
+EXPORTS
+	CCDP_Start @1
+	CCDP_Stop @2
+	CCDP_SetLogType @3

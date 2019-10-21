@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "E:/capp/vs2017/Escort/inc/czmq",
+                "E:/capp/vs2017/Escort/inc/escort",
+                "E:/capp/vs2017/Escort/inc/http",
+                "E:/capp/vs2017/Escort/inc/json",
+                "E:/capp/vs2017/Escort/inc/log",
+                "E:/capp/vs2017/Escort/inc/tcp",
+                "E:/capp/vs2017/Escort/inc/zmq"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.17763.0",
+            "compilerPath": "C:/d/tools/vs2019/VC/Tools/MSVC/14.20.27404/bin/Hostx64/x64/cl.exe",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "msvc-x64"
+        }
+    ],
+    "version": 4
+}
