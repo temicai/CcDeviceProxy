@@ -35,6 +35,13 @@ namespace ccdp
 		E_LBS = 2,
 	};
 
+	enum 
+	{
+		E_HISTORY = 0,
+		E_REALTIME = 1,
+	};
+
+
 	typedef struct tagLocateInfo
 	{
 		char szDeviceId[24];

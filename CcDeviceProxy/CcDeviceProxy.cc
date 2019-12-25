@@ -591,7 +591,7 @@ void CcDeviceProxy::parseDeviceMsg(MessageContent * pMsg_)
 											}
 										}
 									}
-									handleLocate(&locateInfo, 1);
+									handleLocate(&locateInfo, ccdp::E_REALTIME);
 									if (locateInfo.pBaseStationList && locateInfo.nBaseStationCount) {
 										delete[] locateInfo.pBaseStationList;
 										locateInfo.pBaseStationList = NULL;
@@ -707,7 +707,7 @@ void CcDeviceProxy::parseDeviceMsg(MessageContent * pMsg_)
 											}
 										}
 									}
-									handleLocate(&locateInfo, 0);
+									handleLocate(&locateInfo, ccdp::E_HISTORY);
 									if (locateInfo.pBaseStationList && locateInfo.nBaseStationCount) {
 										delete[] locateInfo.pBaseStationList;
 										locateInfo.pBaseStationList = NULL;
@@ -962,7 +962,7 @@ void CcDeviceProxy::handleDisLink(const char * pLink_)
 		DeviceLinkList::iterator iter = m_devLinkList.find(pLink_);
 		if (iter != m_devLinkList.end()) {
 			std::string strDeviceId = iter->second;
-			if (strDeviceId.empty()) {
+			if (!strDeviceId.empty()) {
 				strcpy_s(szDeviceId, sizeof(szDeviceId), strDeviceId.c_str());
 			}
 			m_devLinkList.erase(iter);
