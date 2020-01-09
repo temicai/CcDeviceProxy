@@ -1443,42 +1443,60 @@ void CcDeviceProxy::handlePipeDeviceConfig(escort::DeviceConfigInformation * pDe
 
 void CcDeviceProxy::checkDeviceLink()
 {
-	std::lock_guard<std::mutex> lk(m_mutex4DevList);
-	if (!m_devList.empty()) {
-		unsigned long long now = time(NULL);
-		for (DeviceList::iterator iter = m_devList.begin(); iter != m_devList.end(); iter++) {
-			ccdp::DeviceInfo * pDevice = iter->second;
-			if (pDevice) {
-				bool bNotifyOffline = false;
-				if (pDevice->online == ccdp::E_LS_ONLINE) {
-					unsigned long long interval = now - pDevice->activeTime;
-					if (interval > 60 && interval < 500) {
-						char szCmd[256] = { 0 };
-						sprintf_s(szCmd, sizeof(szCmd), "[SG*%s*0005*VERNO]", pDevice->deviceId);
-						if (TS_SendData(m_ullSrvInst, pDevice->link, szCmd, (unsigned int)strlen(szCmd)) != 0) {
+	size_t nDeviceSize = sizeof(ccdp::DeviceInfo);
+	std::vector<ccdp::DeviceInfo *> offlineDevList;
+	unsigned long long now = time(NULL);
+	if (1) {
+		std::lock_guard<std::mutex> lk(m_mutex4DevList);
+		if (!m_devList.empty()) {
+			for (DeviceList::iterator iter = m_devList.begin(); iter != m_devList.end(); iter++) {
+				ccdp::DeviceInfo * pDevice = iter->second;
+				if (pDevice) {
+					bool bNotifyOffline = false;
+					if (pDevice->online == ccdp::E_LS_ONLINE) {
+						unsigned long long interval = now - pDevice->activeTime;
+						if (interval > 60 && interval < 500) {
+							char szCmd[256] = { 0 };
+							sprintf_s(szCmd, sizeof(szCmd), "[SG*%s*0005*VERNO]", pDevice->deviceId);
+							if (TS_SendData(m_ullSrvInst, pDevice->link, szCmd, (unsigned int)strlen(szCmd)) != 0) {
+								bNotifyOffline = true;
+							}
+						}
+						else if (interval >= 500) {
 							bNotifyOffline = true;
 						}
 					}
-					else if (interval >= 500) {
-						bNotifyOffline = true;
+					if (bNotifyOffline) {
+						pDevice->online = ccdp::E_LS_OFFLINE;
+						ccdp::DeviceInfo * pDupDevice = new ccdp::DeviceInfo();
+						memcpy_s(pDupDevice, nDeviceSize, pDevice, nDeviceSize);
+						offlineDevList.emplace_back(pDupDevice);
 					}
- 				}
-				if (bNotifyOffline) {
-					pDevice->online = ccdp::E_LS_OFFLINE;
-					char szMsg[256] = { 0 };
-					sprintf_s(szMsg, sizeof(szMsg), "{\"seq\":%u,\"id\":\"%s\",\"factory\":1,\"battery\":%d,\"online\":0,"
-						"\"loose\":%d,\"datetime\":%llu}", getNextSequence(), pDevice->deviceId, pDevice->battery,
-						pDevice->loose, now);
-					sendMsgByPipe(szMsg, escort::MSG_DEV_PUSH_INFO);
-					char szLog[256] = { 0 };
-					sprintf_s(szLog, sizeof(szLog), "[device]%s[%d]deviceId=%s, link=%s offline\n", 
-						__FUNCTION__, __LINE__, pDevice->deviceId, pDevice->link);
-					LOG_Log(m_ullLogInst, szLog, pf_logger::eLOGCATEGORY_INFO, m_usLogType);
-					TS_CloseEndpoint(m_ullSrvInst, pDevice->link);
-					memset(pDevice->link, 0, sizeof(pDevice->link));
 				}
 			}
 		}
+	}
+	if (!offlineDevList.empty()) {
+		char szLog[512] = { 0 };
+		std::vector<ccdp::DeviceInfo *>::iterator iter = offlineDevList.begin();
+		while (iter != offlineDevList.end()) {
+			ccdp::DeviceInfo * pDevice = *iter;
+			if (pDevice) {
+				char szMsg[256] = { 0 };
+				sprintf_s(szMsg, sizeof(szMsg), "{\"seq\":%u,\"id\":\"%s\",\"factory\":1,\"battery\":%d,\"online\":0,"
+					"\"loose\":%d,\"datetime\":%llu}", getNextSequence(), pDevice->deviceId, pDevice->battery,
+					pDevice->loose, now);
+				sendMsgByPipe(szMsg, escort::MSG_DEV_PUSH_INFO);
+				sprintf_s(szLog, sizeof(szLog), "[device]%s[%d]deviceId=%s, link=%s offline\n",
+					__FUNCTION__, __LINE__, pDevice->deviceId, pDevice->link);
+				LOG_Log(m_ullLogInst, szLog, pf_logger::eLOGCATEGORY_INFO, m_usLogType);
+				TS_CloseEndpoint(m_ullSrvInst, pDevice->link);
+				delete pDevice;
+				pDevice = NULL;
+			}
+			iter = offlineDevList.erase(iter);
+		}
+		offlineDevList.clear();
 	}
 }
 
