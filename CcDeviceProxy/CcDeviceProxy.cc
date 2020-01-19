@@ -1106,19 +1106,19 @@ void CcDeviceProxy::reportDeviceOnline(const char * pDeviceId_)
 			if (pDevice) {
 				if (pDevice->online == ccdp::E_LS_OFFLINE) {
 					pDevice->online = ccdp::E_LS_ONLINE;
+					sprintf_s(szMsg, sizeof(szMsg), "{\"seq\":%u,\"id\":\"%s\",\"factory\":1,\"battery\":%d,\"online\":1,"
+						"\"loose\":%d,\"datetime\":%llu}", getNextSequence(), pDeviceId_, pDevice->battery, pDevice->loose, now);
 				}
 				pDevice->activeTime = now;
-				sprintf_s(szMsg, sizeof(szMsg), "{\"seq\":%u,\"id\":\"%s\",\"factory\":1,\"battery\":%d,\"online\":1,"
-					"\"loose\":%d,\"datetime\":%llu}", getNextSequence(), pDeviceId_, pDevice->battery, pDevice->loose, now);
 			}
 		}
 	}
 	if (strlen(szMsg)) {
 		sendMsgByPipe(szMsg, escort::MSG_DEV_PUSH_CONF);
+		char szLog[256] = { 0 };
+		sprintf_s(szLog, sizeof(szLog), "[device]%s[%d]update device=%s, online=1\n", __FUNCTION__, __LINE__, pDeviceId_);
+		LOG_Log(m_ullLogInst, szLog, pf_logger::eLOGCATEGORY_INFO, m_usLogType);
 	}
-	char szLog[256] = { 0 };
-	sprintf_s(szLog, sizeof(szLog), "[device]%s[%d]update device=%s, online=1\n", __FUNCTION__, __LINE__, pDeviceId_);
-	LOG_Log(m_ullLogInst, szLog, pf_logger::eLOGCATEGORY_INFO, m_usLogType);
 }
 
 void CcDeviceProxy::handleLocate(ccdp::LocateInfo * pLocateInfo_, int nRealtime_)
