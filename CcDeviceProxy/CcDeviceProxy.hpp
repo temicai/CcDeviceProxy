@@ -1,4 +1,4 @@
-#ifndef DEVICE_RECEIVER_H_
+﻿#ifndef DEVICE_RECEIVER_H_
 #define DEVICE_RECEIVER_H_
 
 #include "json.hpp"
@@ -133,7 +133,7 @@ private:
 	std::mutex m_mutex4DevMsgQue;
 	std::condition_variable m_cond4DevMsgQue;
 	std::queue<MessageContent *> m_devMsgQue;
-	std::thread m_thdDealDevMsg;
+	std::thread m_thdDealDevMsg[4];
 	
 	std::mutex m_mutex4LinkList;
 	typedef std::map<std::string, std::string> DeviceLinkList;
@@ -158,7 +158,7 @@ private:
 protected:
 	void initLog(const char * pDir);
 	bool addDeviceMsg(MessageContent * pMsg);
-	void dealDeviceMsg();
+	void dealDeviceMsg(int index = 0);
 	void parseDeviceMsg(MessageContent * pMsg);
 	int getWholeMessage(const unsigned char * pData, unsigned int uiDataLen, unsigned int uiIndex,
 		unsigned int & uiBeginIndex, unsigned int & uiEndIndex);
@@ -192,7 +192,7 @@ protected:
 	void dealDisLink();
 
 	friend int readPipeline(zloop_t *loop, zsock_t *reader, void *arg);
-	friend void dealDevMsgThread(void *);
+	friend void dealDevMsgThread(int, void *);
 	friend void __stdcall fMsgCb(int nType, void * pMsg, void * pUserData);
 	friend void superviseThread(void *);
 	friend void dealPipeMsgThread(void *);

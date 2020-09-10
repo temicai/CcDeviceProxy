@@ -1,10 +1,10 @@
-#include "CcDeviceProxy.hpp"
+﻿#include "CcDeviceProxy.hpp"
 
-void dealDevMsgThread(void * param_)
+void dealDevMsgThread(int index_, void * param_)
 {
 	CcDeviceProxy * pService = (CcDeviceProxy *)param_;
 	if (pService) {
-		pService->dealDeviceMsg();
+		pService->dealDeviceMsg(index_);
 	}
 }
 
@@ -227,7 +227,10 @@ int CcDeviceProxy::Start(const char * pHost_, unsigned short usDevPort_, const c
 		}
 		m_usLbsQryType = usLbsQry_;
 
-		m_thdDealDevMsg = std::thread(dealDevMsgThread, this);
+		for (int i = 0; i < 4; i++) {
+			m_thdDealDevMsg[i] = std::thread(dealDevMsgThread, i, this);
+		}
+
 		m_thdSupervise = std::thread(superviseThread, this);
 		m_thdDealPipeMsg = std::thread(dealPipeMsgThread, this);
 		m_thdDisLink = std::thread(dealDisLinkThread, this);
@@ -254,10 +257,15 @@ int CcDeviceProxy::Stop()
 			TS_StopServer(m_ullSrvInst);
 			m_ullSrvInst = 0;
 		}
-		if (m_thdDealDevMsg.joinable()) {
-			m_cond4DevMsgQue.notify_all();
-			m_thdDealDevMsg.join();
+		m_cond4DevMsgQue.notify_all();
+		for (int i = 0; i < 4; i++) {
+			m_thdDealDevMsg[i].join();
 		}
+
+		//if (m_thdDealDevMsg.joinable()) {
+		//		m_cond4DevMsgQue.notify_all();
+		//	m_thdDealDevMsg.join();
+		//}
 		if (m_thdSupervise.joinable()) {
 			m_thdSupervise.join();
 		}
@@ -361,12 +369,16 @@ bool CcDeviceProxy::addDeviceMsg(MessageContent * pMsg_)
 		if (m_devMsgQue.size() == 1) {
 			m_cond4DevMsgQue.notify_all();
 		}
+		char szLog[1024] = { 0 };
+		sprintf_s(szLog, sizeof(szLog), "%s[%u]from %s, data=%s, queue size=%zd\n", 
+			__FUNCTION__, __LINE__, pMsg_->szEndPoint, pMsg_->pMsgData, m_devMsgQue.size());
+		LOG_Log(m_ullLogInst, szLog, pf_logger::eLOGCATEGORY_INFO, m_usLogType);
 		result = true;
 	}
 	return result;
 }
 
-void CcDeviceProxy::dealDeviceMsg()
+void CcDeviceProxy::dealDeviceMsg(int index_)
 {
 	do {
 		std::unique_lock<std::mutex> lk(m_mutex4DevMsgQue);
@@ -384,8 +396,8 @@ void CcDeviceProxy::dealDeviceMsg()
 				size_t nLogLen = pMsg->uiMsgDataLen + 256;
 				char * pLog = new char[nLogLen];
 				memset(pLog, 0, nLogLen);
-				sprintf_s(pLog, nLogLen, "%s[%d], recv from %s, len=%u, %s\n", __FUNCTION__, __LINE__,
-					pMsg->szEndPoint, pMsg->uiMsgDataLen, (char *)pMsg->pMsgData);
+				sprintf_s(pLog, nLogLen, "%s[%d], %d, recv from %s, len=%u, %s\n", __FUNCTION__, __LINE__,
+					index_, pMsg->szEndPoint, pMsg->uiMsgDataLen, (char *)pMsg->pMsgData);
 				LOG_Log(m_ullLogInst, pLog, pf_logger::eLOGCATEGORY_INFO, m_usLogType);
 				parseDeviceMsg(pMsg);
 				delete[] pMsg->pMsgData;
