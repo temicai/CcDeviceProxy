@@ -226,6 +226,7 @@ int CcDeviceProxy::Start(const char * pHost_, unsigned short usDevPort_, const c
 			m_usMsgEncrypt = 0;
 		}
 		m_usLbsQryType = usLbsQry_;
+		strcpy_s(m_szLbsDomain, sizeof(m_szLbsDomain), DEFAULT_LBS_DOMAIN);
 
 		for (int i = 0; i < 4; i++) {
 			m_thdDealDevMsg[i] = std::thread(dealDevMsgThread, i, this);
@@ -307,6 +308,11 @@ void CcDeviceProxy::SetLogType(unsigned short usLogType_)
 void CcDeviceProxy::SetLbsQryKey(const char * pKey_)
 {
 	strcpy_s(m_szLbsQryKey, sizeof(m_szLbsQryKey), pKey_);
+}
+
+void CcDeviceProxy::SetLbsQryDomain(const char * pDomain_)
+{
+	strcpy_s(m_szLbsDomain, sizeof(m_szLbsDomain), pDomain_);
 }
 
 void CcDeviceProxy::SetDeviceInterval(unsigned short usIdleInterval_, unsigned short usNormalInterval_,
@@ -1187,8 +1193,8 @@ void CcDeviceProxy::handleLocate(ccdp::LocateInfo * pLocateInfo_, int nRealtime_
 						}
 					}
 					char szUrl[1024] = { 0 };
-					sprintf_s(szUrl, sizeof(szUrl), "http://apilocate.amap.com/position?accesstype=0&imei=&cdma=0&bts=%s&"
-						"nearbts=%s&network=GPRS&macs=%s&output=json&key=%s", szBts, szNearBts, szWifis, m_szLbsQryKey);
+					sprintf_s(szUrl, sizeof(szUrl), "http://%s/position?accesstype=0&imei=&cdma=0&bts=%s&nearbts=%s"
+						"&network=GPRS&macs=%s&output=json&key=%s", m_szLbsDomain, szBts, szNearBts, szWifis, m_szLbsQryKey);
 					LbsQueryResult lbsQry;
 					memset(&lbsQry, 0, sizeof(LbsQueryResult));
 					char szLog[1408] = { 0 };
@@ -1209,10 +1215,11 @@ void CcDeviceProxy::handleLocate(ccdp::LocateInfo * pLocateInfo_, int nRealtime_
 					}
 				} 
 				sprintf_s(szMsg, sizeof(szMsg), "{\"seq\":%u,\"id\":\"%s\",\"factory\":1,\"realtime\":1,\"locateType\":%d,"
-					"\"latitude\":%.06f,\"longitude\":%.06f,\"coordinate\":%d,\"elevation\":%d,\"speed\":%.03f,\"direction\":%0.2f,"
-					"\"locateTime\":%llu,\"battery\":%d,\"loose\":%d}", getNextSequence(), pLocateInfo_->szDeviceId,
-					ccdp::E_LBS, pLocateInfo_->dLatitude, pLocateInfo_->dLongitude, coordinate, pLocateInfo_->nElevation, 
-					pLocateInfo_->dSpeed, pLocateInfo_->dDirection, pLocateInfo_->ullLocateTime, pLocateInfo_->nBattery, loose);
+					"\"latitude\":%.06f,\"longitude\":%.06f,\"coordinate\":%d,\"elevation\":%d,\"speed\":%.03f,"
+					"\"direction\":%0.2f,\"locateTime\":%llu,\"battery\":%d,\"loose\":%d}", 
+					getNextSequence(), pLocateInfo_->szDeviceId, ccdp::E_LBS, pLocateInfo_->dLatitude, 
+					pLocateInfo_->dLongitude, coordinate, pLocateInfo_->nElevation, pLocateInfo_->dSpeed, 
+					pLocateInfo_->dDirection, pLocateInfo_->ullLocateTime, pLocateInfo_->nBattery, loose);
 				sendMsgByPipe(szMsg, escort::MSG_DEV_PUSH_LOCATE);
 			}		
 			std::lock_guard<std::mutex> lk(m_mutex4DevList);

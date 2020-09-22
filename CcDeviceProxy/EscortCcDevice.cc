@@ -57,6 +57,9 @@ unsigned long long __stdcall CCDP_Start(CcDeviceProxyParameterList paramList_)
 		if (pProxy->Start(paramList_.proxyHost, paramList_.recvPort, paramList_.msgIp, paramList_.repPort, 
 			paramList_.msgEncrypt, paramList_.qryLbsType) == 0) {
 			pProxy->SetLbsQryKey(paramList_.qryLbsKey);
+			if (strlen(paramList_.qryLbsDomain)) {
+				pProxy->SetLbsQryDomain(paramList_.qryLbsDomain);
+			}
 			//pProxy->SetLogType(paramList_.logType);
 			unsigned long long ullInst = (unsigned long long)pProxy;
 			std::lock_guard<std::mutex> lk(g_mutex4ProxyList);

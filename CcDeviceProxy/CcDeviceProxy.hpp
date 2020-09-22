@@ -20,6 +20,7 @@
 
 #define BEGIN_TOKEN 0x5b
 #define END_TOKEN 0x5d
+#define DEFAULT_LBS_DOMAIN "apilocate.amap.com"
 
 namespace ccdp
 {
@@ -105,6 +106,7 @@ public:
 	int Stop();
 	void SetLogType(unsigned short logType);
 	void SetLbsQryKey(const char * key);
+	void SetLbsQryDomain(const char * domain);
 	void SetDeviceInterval(unsigned short, unsigned short, unsigned short); //unit: second
 
 private:
@@ -124,11 +126,11 @@ private:
 	unsigned short m_usMsgEncrypt;
 	unsigned short m_usLbsQryType; //0:false,1:true
 	char m_szLbsQryKey[128] = { 0 };
+	char m_szLbsDomain[128] = {0};
 
 	unsigned short m_usLogType;
 	unsigned long long m_ullLogInst;
 	
-
 	char m_szHost[32];
 	std::mutex m_mutex4DevMsgQue;
 	std::condition_variable m_cond4DevMsgQue;

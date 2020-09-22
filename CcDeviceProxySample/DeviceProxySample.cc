@@ -1,4 +1,4 @@
-#include "EscortCcDevice.h"
+﻿#include "EscortCcDevice.h"
 #include <vector>
 #include <map>
 #include <string>
@@ -74,6 +74,7 @@ int main(int argc, char ** argv)
 	char szProxyHost[32] = { 0 };
 	char szMsgIp[32] = { 0 };
 	char szLbsQryKey[128] = { 0 };
+	char szLbsQryDomain[128] = { 0 };
 	unsigned short usRecvPort = 0;
 	unsigned short usRepPort = 0;
 	unsigned short usLogType = 0;
@@ -129,7 +130,12 @@ int main(int argc, char ** argv)
 			delete [] report_encrypt;
 			report_encrypt = NULL;
 		}
-
+		char* lbs_domain = readItem(kvPair, "lbs_domain");
+		if (lbs_domain) {
+			strcpy_s(szLbsQryDomain, sizeof(szLbsQryDomain), lbs_domain);
+			delete[] lbs_domain;
+			lbs_domain = NULL;
+		}
 		CcDeviceProxyParameterList paramList;
 		memset(&paramList, 0, sizeof(CcDeviceProxyParameterList));
 		paramList.logType = usLogType;
@@ -140,6 +146,7 @@ int main(int argc, char ** argv)
 		strcpy_s(paramList.proxyHost, sizeof(paramList.proxyHost), szProxyHost);
 		strcpy_s(paramList.qryLbsKey, sizeof(paramList.qryLbsKey), szLbsQryKey);
 		strcpy_s(paramList.msgIp, sizeof(paramList.msgIp), szMsgIp);
+		strcpy_s(paramList.qryLbsDomain, sizeof(paramList.qryLbsDomain), szLbsQryDomain);
 		unsigned long long ullInst = CCDP_Start(paramList);
 		if (ullInst) {
 			printf("start device proxy [%s:%hu] ok, connect to message service [%s:%hu]\n",

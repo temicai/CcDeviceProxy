@@ -1,4 +1,4 @@
-#ifndef ESCORT_CC_DEVICE_PROXY_H
+﻿#ifndef ESCORT_CC_DEVICE_PROXY_H
 #define ESCORT_CC_DEVICE_PROXY_H
 
 #ifdef __cplusplus
@@ -16,6 +16,7 @@ extern "C"
 		unsigned short msgEncrypt;
 		unsigned short qryLbsType;
 		char qryLbsKey[128];
+		char qryLbsDomain[128];
 	} CcDeviceProxyParameterList;
 
 	unsigned long long __stdcall CCDP_Start(CcDeviceProxyParameterList paramList);
