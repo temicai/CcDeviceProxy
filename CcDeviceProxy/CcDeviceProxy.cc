@@ -1063,6 +1063,9 @@ void CcDeviceProxy::updateDevice(const char * pLink_, const char * pDeviceId_)
 				pDevInfo->loose = -1;
 				pDevInfo->online = 1;
 				pDevInfo->battery = 0;
+				pDevInfo->recordPos = 0;
+				pDevInfo->lastLat = .0;
+				pDevInfo->lastLng = .0;
 				strcpy_s(pDevInfo->deviceId, sizeof(pDevInfo->deviceId), pDeviceId_);
 				strcpy_s(pDevInfo->link, sizeof(pDevInfo->link), pLink_);
 				pDevInfo->activeTime = now;
@@ -1095,6 +1098,9 @@ void CcDeviceProxy::updateDeviceBattery(const char * pLink_, const char * pDevic
 			pDevice->loose = -1;
 			pDevice->online = ccdp::E_LS_ONLINE;
 			pDevice->battery = battery_;
+			pDevice->recordPos = 0;
+			pDevice->lastLat = .0;
+			pDevice->lastLng = .0;
 			strcpy_s(pDevice->deviceId, sizeof(pDevice->deviceId), pDeviceId_);
 			strcpy_s(pDevice->link, sizeof(pDevice->link), pLink_);
 			pDevice->activeTime = now;
@@ -1148,14 +1154,31 @@ void CcDeviceProxy::handleLocate(ccdp::LocateInfo * pLocateInfo_, int nRealtime_
 			if (pLocateInfo_->nLocateType == ccdp::E_GPS) { //gps
 				sprintf_s(szMsg, sizeof(szMsg), "{\"seq\":%u,\"id\":\"%s\",\"factory\":1,\"realtime\":1,\"locateType\":%d,"
 					"\"latitude\":%.06f,\"longitude\":%.06f,\"elevation\":%d,\"coordinate\":%d,\"speed\":%.03f,"
-					"\"direction\":%0.2f,\"locateTime\":%llu,\"battery\":%d,\"loose\":%d}", getNextSequence(), 
-					pLocateInfo_->szDeviceId, ccdp::E_GPS, pLocateInfo_->dLatitude, pLocateInfo_->dLongitude, 
-					pLocateInfo_->nElevation, escort::COORDTYPE_WGS84, pLocateInfo_->dSpeed, pLocateInfo_->dDirection,
-					pLocateInfo_->ullLocateTime, pLocateInfo_->nBattery, loose);
+					"\"direction\":%0.2f,\"locateTime\":%llu,\"battery\":%d,\"loose\":%d,\"accuracy\":1}", 
+					getNextSequence(), pLocateInfo_->szDeviceId, ccdp::E_GPS, pLocateInfo_->dLatitude, 
+					pLocateInfo_->dLongitude, pLocateInfo_->nElevation, escort::COORDTYPE_WGS84, pLocateInfo_->dSpeed, 
+					pLocateInfo_->dDirection, pLocateInfo_->ullLocateTime, pLocateInfo_->nBattery, loose);
 				sendMsgByPipe(szMsg, escort::MSG_DEV_PUSH_LOCATE);
+				std::lock_guard<std::mutex> lk(m_mutex4DevList);
+				DeviceList::iterator iter = m_devList.find(pLocateInfo_->szDeviceId);
+				if (iter != m_devList.end()) {
+					ccdp::DeviceInfo* pDevice = iter->second;
+					if (pDevice) {
+						pDevice->activeTime = time(NULL);
+						pDevice->battery = pLocateInfo_->nBattery;
+						pDevice->loose = loose;
+						pDevice->online = ccdp::E_LS_ONLINE;
+						if (pDevice->recordPos == 0) {
+							pDevice->recordPos = 1;
+						}
+						pDevice->lastLat = pLocateInfo_->dLatitude;
+						pDevice->lastLng = pLocateInfo_->dLongitude;
+					}
+				}
 			}
 			else { //lbs
 				int coordinate = escort::COORDTYPE_WGS84;
+				int nAccuracy = 0;
 				if (m_usLbsQryType && strlen(m_szLbsQryKey)) {
 					char szBts[32] = { 0 };
 					char szNearBts[256] = { 0 };
@@ -1203,6 +1226,23 @@ void CcDeviceProxy::handleLocate(ccdp::LocateInfo * pLocateInfo_, int nRealtime_
 							coordinate = escort::COORDTYPE_GCJ02;
 							pLocateInfo_->dLatitude = lbsQry.dLat;
 							pLocateInfo_->dLongitude = lbsQry.dLng;
+							nAccuracy = 1;
+							std::lock_guard<std::mutex> lk(m_mutex4DevList);
+							DeviceList::iterator iter = m_devList.find(pLocateInfo_->szDeviceId);
+							if (iter != m_devList.end()) {
+								ccdp::DeviceInfo* pDevice = iter->second;
+								if (pDevice) {
+									pDevice->activeTime = time(NULL);
+									pDevice->battery = pLocateInfo_->nBattery;
+									pDevice->loose = loose;
+									pDevice->online = ccdp::E_LS_ONLINE;
+									if (pDevice->recordPos == 0) {
+										pDevice->recordPos = 1;
+									}
+									pDevice->lastLat = pLocateInfo_->dLatitude;
+									pDevice->lastLng = pLocateInfo_->dLongitude;
+								}
+							}
 						}
 						sprintf_s(szLog, sizeof(szLog), "[device]%s[%d]lbs url=%s, result=%d, latitude=%.06f, longitude=%.06f,"
 							" coordinate=%d\n", __FUNCTION__, __LINE__, szUrl, lbsQry.nRetCode, lbsQry.dLat, lbsQry.dLng, 
@@ -1210,37 +1250,43 @@ void CcDeviceProxy::handleLocate(ccdp::LocateInfo * pLocateInfo_, int nRealtime_
 						LOG_Log(m_ullLogInst, szLog, pf_logger::eLOGCATEGORY_INFO, m_usLogType);
 					}
 					else {
-						sprintf_s(szLog, sizeof(szLog), "[device]%s[%d]lbs url=%s, failed\n", __FUNCTION__, __LINE__, szUrl);
+						std::lock_guard<std::mutex> lk(m_mutex4DevList);
+						DeviceList::iterator iter = m_devList.find(pLocateInfo_->szDeviceId);
+						if (iter != m_devList.end()) {
+							ccdp::DeviceInfo* pDevice = iter->second;
+							if (pDevice) {
+								pDevice->activeTime = time(NULL);
+								pDevice->battery = pLocateInfo_->nBattery;
+								pDevice->loose = loose;
+								pDevice->online = ccdp::E_LS_ONLINE;
+								if (pDevice->recordPos == 1) {
+									pLocateInfo_->dLatitude = pDevice->lastLat;
+									pLocateInfo_->dLongitude = pDevice->lastLng;
+								}
+							}
+						}
+						sprintf_s(szLog, sizeof(szLog), "[device]%s[%d]lbs url=%s, failed, record lat=%.6f, lng=%.6f\n",
+							__FUNCTION__, __LINE__, szUrl, pLocateInfo_->dLatitude, pLocateInfo_->dLongitude);
 						LOG_Log(m_ullLogInst, szLog, pf_logger::eLOGCATEGORY_INFO, m_usLogType);
 					}
 				} 
 				sprintf_s(szMsg, sizeof(szMsg), "{\"seq\":%u,\"id\":\"%s\",\"factory\":1,\"realtime\":1,\"locateType\":%d,"
 					"\"latitude\":%.06f,\"longitude\":%.06f,\"coordinate\":%d,\"elevation\":%d,\"speed\":%.03f,"
-					"\"direction\":%0.2f,\"locateTime\":%llu,\"battery\":%d,\"loose\":%d}", 
+					"\"direction\":%0.2f,\"locateTime\":%llu,\"battery\":%d,\"loose\":%d,\"accuracy\":%d}", 
 					getNextSequence(), pLocateInfo_->szDeviceId, ccdp::E_LBS, pLocateInfo_->dLatitude, 
 					pLocateInfo_->dLongitude, coordinate, pLocateInfo_->nElevation, pLocateInfo_->dSpeed, 
-					pLocateInfo_->dDirection, pLocateInfo_->ullLocateTime, pLocateInfo_->nBattery, loose);
+					pLocateInfo_->dDirection, pLocateInfo_->ullLocateTime, pLocateInfo_->nBattery, loose, nAccuracy);
 				sendMsgByPipe(szMsg, escort::MSG_DEV_PUSH_LOCATE);
 			}		
-			std::lock_guard<std::mutex> lk(m_mutex4DevList);
-			DeviceList::iterator iter = m_devList.find(pLocateInfo_->szDeviceId);
-			if (iter != m_devList.end()) {
-				ccdp::DeviceInfo * pDevice = iter->second;
-				if (pDevice) {
-					pDevice->activeTime = time(NULL);
-					pDevice->battery = pLocateInfo_->nBattery;
-					pDevice->loose = loose;
-					pDevice->online = ccdp::E_LS_ONLINE;
-				}
-			}
 		}
 		else { //history
 			sprintf_s(szMsg, sizeof(szMsg), "{\"seq\":%u,\"id\":\"%s\",\"factory\":1,\"realtime\":0,\"locateType\":%d,"
-				"\"latitude\":%.06f,\"longitude\":%.06f,\"elevation\":%d,\"coordinate\":%d,\"speed\":%.03f,\"direction\":%0.2f,"
-				"\"locateTime\":%llu,\"battery\":%d,\"loose\":%d}", getNextSequence(), pLocateInfo_->szDeviceId,
-				pLocateInfo_->nLocateType, pLocateInfo_->dLatitude, pLocateInfo_->dLongitude, pLocateInfo_->nElevation,
-				escort::COORDTYPE_WGS84, pLocateInfo_->dSpeed, pLocateInfo_->dDirection, pLocateInfo_->ullLocateTime, 
-				pLocateInfo_->nBattery, loose);
+				"\"latitude\":%.06f,\"longitude\":%.06f,\"elevation\":%d,\"coordinate\":%d,\"speed\":%.03f,"
+				"\"direction\":%0.2f,\"locateTime\":%llu,\"battery\":%d,\"loose\":%d,\"accuracy\":%d}", 
+				getNextSequence(), pLocateInfo_->szDeviceId,pLocateInfo_->nLocateType, pLocateInfo_->dLatitude, 
+				pLocateInfo_->dLongitude, pLocateInfo_->nElevation, escort::COORDTYPE_WGS84, pLocateInfo_->dSpeed, 
+				pLocateInfo_->dDirection, pLocateInfo_->ullLocateTime, pLocateInfo_->nBattery, loose, 
+				(pLocateInfo_->nLocateType == ccdp::E_GPS) ? 1 : 0);
 			sendMsgByPipe(szMsg, escort::MSG_DEV_PUSH_LOCATE);
 		}
 	}

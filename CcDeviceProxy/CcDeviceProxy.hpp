@@ -89,10 +89,13 @@ namespace ccdp
 	{
 		char deviceId[24];
 		char link[32];
-		int loose; //0:normal,1:loose
-		int online; //0:offline,1:online
-		int battery;
+		int loose:8; //0:normal,1:loose
+		int online:8; //0:offline,1:online
+		int battery:8;
+		int recordPos : 8;
 		unsigned long long activeTime;
+		double lastLat;
+		double lastLng;
 	} DeviceInfo;
 }
 
